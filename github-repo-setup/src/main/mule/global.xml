@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:sap="http://www.mulesoft.org/schema/mule/sap"
+      xmlns:tls="http://www.mulesoft.org/schema/mule/tls"
+      xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:mcp="http://www.mulesoft.org/schema/mule/mcp"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core    http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/http    http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+        http://www.mulesoft.org/schema/mule/mcp     http://www.mulesoft.org/schema/mule/mcp/current/mule-mcp.xsd
+        http://www.mulesoft.org/schema/mule/tls     http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd
+        http://www.mulesoft.org/schema/mule/sap     http://www.mulesoft.org/schema/mule/sap/current/mule-sap.xsd">
+
+    <!-- Configuration Properties: loads all application settings from config.properties.
+         SAP connection properties (zuul::sap.*) are resolved at runtime by the
+         Zuul property management platform in deployed environments. -->
+    <configuration-properties
+        file="config.properties"
+        doc:name="Configuration properties"
+        doc:description="Loads all application settings from config.properties"/>
+
+    <!-- HTTP Listener Config for MCP Streamable HTTP Transport.
+         The MCP server-config references this via listenerConfig. -->
+    <http:listener-config
+        name="MCP_HTTP_Listener_Config"
+        doc:name="MCP HTTP Listener Config"
+        doc:description="HTTP listener used exclusively by the MCP Streamable HTTP transport">
+        <http:listener-connection host="${http.host}" port="${http.port}"/>
+    </http:listener-config>
+
+    <!-- MCP Server Config (Streamable HTTP Transport).
+         Exposes the GitHub setup functionality as an MCP Tool.
+         Stateless so that Session-not-found errors do not occur after restart. -->
+    <mcp:server-config
+        name="MCP_Listener_Config"
+        serverName="${mcp.serverName}"
+        serverVersion="${mcp.serverVersion}"
+        doc:name="MCP Listener Config"
+        doc:description="MCP server configuration using Streamable HTTP transport (stateless). Exposes GitHub repo setup as an AI-callable MCP tool.">
+        <mcp:streamable-http-server-connection listenerConfig="MCP_HTTP_Listener_Config"/>
+    </mcp:server-config>
+
+    <!-- GitHub API HTTP Request Config.
+         HTTPS + Token Auth. Set github.token in config.properties to a PAT
+         with repo scope. Generate at: https://github.com/settings/tokens -->
+    <http:request-config
+        name="GitHub_API_Config"
+        doc:name="GitHub API Config"
+        doc:description="HTTPS request configuration for api.github.com using PAT token authentication from config.properties">
+        <http:request-connection host="${github.api.host}" port="${github.api.port}" protocol="HTTPS">
+            <tls:context>
+                <tls:trust-store insecure="true"/>
+            </tls:context>
+            <http:authentication>
+                <http:basic-authentication
+                    username="${github.username}"
+                    password="${github.token}"/>
+            </http:authentication>
+        </http:request-connection>
+    </http:request-config>
+
+    <!-- SAP Connector Config: Message Server-Based Connection (Mule 4 / SAP Connector 4.x)
+
+         IMPORTANT: Application Server and Message Server configurations MUST NOT
+         be mixed in a single SAP connector configuration.
+         This configuration uses the Message Server approach exclusively.
+
+         Step 1 - General tab / Connection credentials (Zuul property group):
+           username      = ${zuul::sap.username}
+           password      = ${zuul::sap.password}
+           systemNumber  = ${zuul::sap.systemNumber}
+           client (ID)   = ${zuul::sap.clientId}
+
+         Step 2 - General tab / HOST section / Message Server Configuration (Edit Inline):
+           Message server host       = ${zuul::sap.host}
+           System ID                 = ${zuul::sap.r3Name}
+           Message server port       = ${zuul::sap.port}
+           Messaging server group    = ${zuul::sap.logon.group}
+
+         Step 3 - Advanced tab / Extended Properties (Edit Inline):
+           jco.client.mshost     = ${zuul::sap.host}
+           jco.client.msserv     = ${zuul::sap.port}
+           jco.client.group      = ${zuul::sap.logon.group}
+           jco.client.saprouter  = /H/52.4.121.113  (SAP router — hardcoded)
+
+         Required SAP libraries (place in project libs/ folder):
+           sapjco3.jar    (JCo Library)
+           sapidoc3.jar   (IDoc Library)
+           libsapjco3.dll / libsapjco3.so  (JCo Native Library, add to system PATH)
+    -->
+
+</mule>
