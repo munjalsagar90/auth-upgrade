@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:sap="http://www.mulesoft.org/schema/mule/sap" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/sap http://www.mulesoft.org/schema/mule/sap/current/mule-sap.xsd">
+	<configuration-properties file="config.properties" doc:name="Configuration properties"
+		doc:description="Loads all application settings from config.properties"/>
+
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="41a27556-d564-47b2-a7fc-744a1f1a26e5" >
+		<http:listener-connection host="${http.host}" port="${http.port}" />
+	</http:listener-config>
+
+	<!-- SAP Config — Direct Application Server connection.
+	     All values are loaded from config.properties via property placeholders. -->
+	<sap:sap-config name="SAP_Config" doc:name="SAP Config" doc:id="492a29d1-0734-42f7-8f69-8c0b80d927f8" >
+		<sap:simple-connection-provider-connection
+			username="${sap.username}"
+			password="${sap.password}"
+			systemNumber="${sap.system.number}"
+			client="${sap.client}"
+			applicationServerHost="${sap.app.server.host}" >
+		</sap:simple-connection-provider-connection>
+	</sap:sap-config>
+	<flow name="auth-upgradeFlow" doc:id="bcc03d09-80ca-4256-ac0b-078508a98c23" >
+		<http:listener doc:name="Listener" doc:id="3aadd124-e16f-4c3f-ab95-96a3b0b06c0a" config-ref="HTTP_Listener_config" path="/auth"/>
+		<sap:send key="SPAPS" doc:name="Send IDoc" doc:id="73bfbdaf-3022-4dc4-928c-d88a4754107b" config-ref="SAP_Config"/>
+		<logger level="INFO" doc:name="Logger" doc:id="0e31d1ac-0858-4ed2-896e-730b01271e27" message="done"/>
+	</flow>
+</mule>
+ 
