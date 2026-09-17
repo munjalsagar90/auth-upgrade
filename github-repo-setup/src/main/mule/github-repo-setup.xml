@@ -36,7 +36,7 @@
                 <set-variable variableName="repoName" value="#[payload.repoName]" doc:name="Store repoName" doc:description="Repo name"/>
                 <http:request method="GET" config-ref="GitHub_API_Config" path="/search/repositories" doc:name="Search GitHub Repo" doc:description="Searches GitHub API for the repository">
                     <http:headers><![CDATA[#[output application/java --- {"Accept":"application/vnd.github.v3+json","User-Agent":"MuleSoft-MCP-GitHub-Integration/1.0"}]]]></http:headers>
-                    <http:query-params><![CDATA[#[output application/java --- {"q":vars.repoName++" user:"++p('github.username'),"per_page":"5"}]]]></http:query-params>
+                    <http:query-params><![CDATA[#[output application/java --- {"q":vars.repoName ++ " user:" ++ p('github.username'),"per_page":"5"}]]]></http:query-params>
                 </http:request>
                 <choice doc:name="Repo Found?" doc:description="Validates search result">
                     <when expression="#[(payload.total_count default 0)==0]" doc:name="Not Found" doc:description="Repo not found">
@@ -64,7 +64,7 @@ var r=payload.items[0]
                         <http:request method="POST" config-ref="GitHub_API_Config"
                             path="#['/repos/' ++ vars.repoOwner ++ '/' ++ vars.repoNameClean ++ '/git/refs']"
                             doc:name="Create Feature Branch" doc:description="Creates feature/add-sap-dependency branch">
-                            <http:body><![CDATA[#[%dw 2.0 output application/json --- {"ref":"refs/heads/"++p('feature.branch.name'),"sha":vars.baseSha}]]]></http:body>
+                            <http:body><![CDATA[#[%dw 2.0 output application/json --- {"ref":"refs/heads/" ++ p('feature.branch.name'),"sha":vars.baseSha}]]]></http:body>
                             <http:headers><![CDATA[#[output application/java --- {"Accept":"application/vnd.github.v3+json","Content-Type":"application/json","User-Agent":"MuleSoft-MCP-GitHub-Integration/1.0"}]]]></http:headers>
                         </http:request>
                         <http:request method="GET" config-ref="GitHub_API_Config"
