@@ -47,6 +47,7 @@
 							<artifactId>com.sap.conn.idoc.sapidoc3</artifactId>
 						</sharedLibrary>
 					</sharedLibraries>
+					<classifier>mule-application</classifier>
 				</configuration>
 			</plugin>
 			<plugin>
