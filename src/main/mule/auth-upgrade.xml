@@ -12,17 +12,7 @@ http://www.mulesoft.org/schema/mule/sap http://www.mulesoft.org/schema/mule/sap/
 		<http:listener-connection host="${http.host}" port="${http.port}" />
 	</http:listener-config>
 
-	<!-- SAP Config — Direct Application Server connection.
-	     All values are loaded from config.properties via property placeholders. -->
-	<sap:sap-config name="SAP_Config" doc:name="SAP Config" doc:id="492a29d1-0734-42f7-8f69-8c0b80d927f8" >
-		<sap:simple-connection-provider-connection
-			username="${sap.username}"
-			password="${sap.password}"
-			systemNumber="${sap.system.number}"
-			client="${sap.client}"
-			applicationServerHost="${sap.app.server.host}" >
-		</sap:simple-connection-provider-connection>
-	</sap:sap-config>
+	
 	<flow name="auth-upgradeFlow" doc:id="bcc03d09-80ca-4256-ac0b-078508a98c23" >
 		<http:listener doc:name="Listener" doc:id="3aadd124-e16f-4c3f-ab95-96a3b0b06c0a" config-ref="HTTP_Listener_config" path="/auth"/>
 		<sap:send key="SPAPS" doc:name="Send IDoc" doc:id="73bfbdaf-3022-4dc4-928c-d88a4754107b" config-ref="SAP_Config"/>
