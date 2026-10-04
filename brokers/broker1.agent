@@ -1,0 +1,178 @@
+# @dialect: AGENTFABRIC=1.2
+system:
+  instructions: |
+    You are an SAP connection upgrade assistant. Your job is to help users upgrade
+    SAP connection configuration in a GitHub repository (under munjalsagar90) from
+    Application Server format to Message Server format with Extended Properties.
+
+    Before invoking the upgrade tool you MUST collect BOTH of the following from the user:
+    1. repoName     – the exact GitHub repository name under munjalsagar90
+    2. approverName – the GitHub username to add as pull-request reviewer
+
+    Always ask for missing values. Never call the tool until both are confirmed.
+
+config:
+  agent_name: "SAP Upgrade Broker"
+  default_llm: @llm.openai_llm
+
+llm:
+  openai_llm:
+    target: "llm://openaiConnection"
+    kind: "OpenAI"
+    model: "gpt-4o"
+
+actions:
+  update_sap_connection:
+    target: "mcp://updateSapConnectionUtilConnection"
+    kind: "mcp:tool"
+    tool_name: "update-sap-connection"
+    inputs:
+      repoName: string
+      approverName: string
+
+trigger brokerTrigger:
+  kind: "a2a"
+  target: "brokers://sapUpgradeBroker/a2a"
+  on_message: ->
+    transition to @orchestrator.main
+
+orchestrator main:
+  description: "Extracts repoName and approverName from the user message, then invokes the SAP connection upgrade MCP tool."
+  label: "SAP Upgrade Orchestrator"
+  system:
+    instructions: |
+      You are an SAP connection upgrade assistant.
+
+      Your goal is to call the update_sap_connection tool to upgrade SAP connection
+      configuration in a GitHub repository. The tool requires exactly two inputs:
+        - repoName:     The GitHub repository name under munjalsagar90 (e.g. "auth-service")
+        - approverName: The GitHub username who will review the pull request (e.g. "johndoe")
+
+      Steps:
+      1. Read the user message carefully.
+      2. If repoName or approverName is missing, ask the user to supply the missing value(s).
+      3. Once both values are available, call the update_sap_connection tool.
+      4. Return the tool result as-is; do not summarise or omit any fields.
+  reasoning:
+    instructions: ->
+      | {!@request.payload.message.parts[0].text}
+    actions:
+      update_sap_connection: @actions.update_sap_connection
+        with repoName = ...
+        with approverName = ...
+    outputs:
+      properties:
+        success:
+          type: "boolean"
+          description: "Whether the SAP upgrade completed successfully"
+        message:
+          type: "string"
+          description: "Human-readable summary of the upgrade result"
+        repoName:
+          type: "string"
+          description: "The repository that was processed"
+        approverName:
+          type: "string"
+          description: "The reviewer added to the pull request"
+        pullRequest:
+          type: "object"
+          description: "Pull request details including URL, number, head, and base branch"
+          properties:
+            created:
+              type: "boolean"
+              description: "Whether the PR was created"
+            number:
+              type: "number"
+              description: "Pull request number"
+            url:
+              type: "string"
+              description: "Pull request HTML URL"
+            head:
+              type: "string"
+              description: "Source branch of the PR"
+            base:
+              type: "string"
+              description: "Target branch of the PR"
+            reviewer:
+              type: "string"
+              description: "GitHub username added as reviewer"
+        sapConfigChanges:
+          type: "object"
+          description: "Details of SAP configuration files scanned and upgraded"
+          properties:
+            filesScanned:
+              type: "number"
+              description: "Total XML files scanned in src/main/mule/"
+            filesUpgraded:
+              type: "number"
+              description: "Number of files upgraded to Message Server format"
+            upgradedFiles:
+              type: "string"
+              description: "Comma-separated list of upgraded file paths"
+        versionBump:
+          type: "object"
+          description: "pom.xml version bump details"
+          properties:
+            bumped:
+              type: "boolean"
+              description: "Whether the pom.xml version was bumped"
+            oldVersion:
+              type: "string"
+              description: "Previous pom.xml version"
+            newVersion:
+              type: "string"
+              description: "Updated pom.xml version after patch increment"
+  on_exit: ->
+    transition to @executor.runSapUpgrade
+
+executor runSapUpgrade:
+  do: ->
+    run @actions.update_sap_connection
+      with repoName = @orchestrator.main.output.repoName
+      with approverName = @orchestrator.main.output.approverName
+  on_exit: ->
+    transition to @generator.formatResponse
+
+generator formatResponse:
+  system:
+    instructions: |
+      You generate clear, well-formatted user-facing messages that summarise the result
+      of an SAP connection upgrade. Include key details such as:
+      - Whether the upgrade succeeded or failed
+      - Which files were upgraded (if any)
+      - The pom.xml version change (old → new)
+      - The pull request URL and number
+      - The reviewer who was added
+  prompt: ->
+    | Generate a response message based on the following SAP upgrade result:
+      {!@executor.runSapUpgrade.output}
+  on_exit: ->
+    transition to @router.resultRouter
+
+router resultRouter:
+  routes:
+    - target: @echo.successResponse
+      when: @executor.runSapUpgrade.output.success == "true"
+      label: "Success"
+  otherwise:
+    target: @echo.errorResponse
+
+echo successResponse:
+  kind: "a2a:status_update_event"
+  state: "TASK_STATE_COMPLETED"
+  message: a2a.message({
+    messageId: uuid(),
+    parts:[
+      a2a.textPart(@generator.formatResponse.output)
+    ]
+  })
+
+echo errorResponse:
+  kind: "a2a:status_update_event"
+  state: "TASK_STATE_FAILED"
+  message: a2a.message({
+    messageId: uuid(),
+    parts:[
+      a2a.textPart("SAP connection upgrade failed. Please verify the repository name and approver username, then try again.")
+    ]
+  })
